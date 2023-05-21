@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link ,useNavigate} from "react-router-dom";
 import avatar from "./../assets/profile.png";
 import styles from "../styles/Username.module.css";
-import { Toaster } from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { useFormik } from "formik";
-import { registerValidate  } from "../helper/validate";
+import { registerValidate } from "../helper/validate";
 import convertToBase64 from "../helper/converter";
+import { registerUser } from "./../helper/helper";
 const Register = () => {
-  const [file,setFile] = useState()
+  const [file, setFile] = useState();
+  const navigate = useNavigate()
   const formik = useFormik({
     initialValues: {
       email: "",
@@ -18,14 +20,23 @@ const Register = () => {
     validateOnBlur: false,
     validateOnChange: false,
     onSubmit: async (values) => {
-      values= Object.assign(values,{profile:file||''})
-      console.log(values);
+      values = Object.assign(values, { profile: file || "" });
+      let registerPromise = registerUser(values);
+      toast.promise(registerPromise,{
+        loading:'Creating...!',
+        success: <b>Register successfully...!</b>,
+        error : <b> Could not register</b>
+      })
+
+      registerPromise.then(()=>{
+        navigate('/')
+      })
     },
   });
-  const onUpload = async (e)=>{
-    const base64 = await convertToBase64(e.target.files[0])
+  const onUpload = async (e) => {
+    const base64 = await convertToBase64(e.target.files[0]);
     setFile(base64);
-  }
+  };
 
   return (
     <div className="container mx-auto">
@@ -42,9 +53,18 @@ const Register = () => {
           <form onSubmit={formik.handleSubmit} action="" className="py-1">
             <div className="profile flex justify-center py-4">
               <label htmlFor="profile">
-                <img src={file||avatar} className={styles.profile_img} alt="avatar" />
+                <img
+                  src={file || avatar}
+                  className={styles.profile_img}
+                  alt="avatar"
+                />
               </label>
-              <input onChange={onUpload} type="file" name="profile" id="profile" />
+              <input
+                onChange={onUpload}
+                type="file"
+                name="profile"
+                id="profile"
+              />
             </div>
             <div className="textbox flex flex-col items-center gap-6">
               <input

@@ -2,6 +2,7 @@ import UserModel from '../model/User.model.js';
 import bcrypt from 'bcrypt'
 import Jwt from 'jsonwebtoken';
 import otpGenerator from 'otp-generator'
+import ENV from "./../config.js"
 
 // Middleware for verifying user
 export async function verifyUser(req, res, next) {
@@ -9,12 +10,17 @@ export async function verifyUser(req, res, next) {
         const { username } = req.method == "GET" ? req.query : req.body;
         // checking user existence
         const user = await UserModel.findOne({ username })
-        if (!user) return res.status(404).send({ error: "Can't find User!" })
-        next();
+        if (!user) {
+            return res.status(404).send({ error: "Can't find User!" });
+        }
+        else {
+            next();
+        }
     } catch (error) {
-        return res.status(404).send({ error: "authentication error" })
+        return res.status(404).send({ error: "authentication error" });
     }
 }
+
 
 
 // POST:api/register
@@ -77,14 +83,13 @@ export async function login(req, res) {
                             userId: user._id,
                             username: user.username,
 
-                        }, 'secret', { expiresIn: "24h" });
+                        }, ENV.SECRET, { expiresIn: "24h" });
 
                         return res.status(201).send({
                             msg: "Login succesful...!",
                             username: user.username,
                             token
                         })
-
                     })
                     .catch(err => {
                         return res.status(400).send({ err: "password does not match" })
@@ -141,21 +146,83 @@ export async function updateUser(req, res) {
 
 // GET:api/generateOTP
 export async function generateOTP(req, res) {
-    otpGenerator.generate(6,{lowerCaseAlphabets:false,upperCaseAlphabets:false,specialChars:false})
+    req.app.locals.OTP = await otpGenerator.generate(6, { lowerCaseAlphabets: false, upperCaseAlphabets: false, specialChars: false })
+    res.status(201).send({ code: req.app.locals.OTP })
 }
 
 // GET:api/verifyOTP
 export async function verifyOTP(req, res) {
-    res.json('verifyOTP route');
+    const { code } = req.query;
+    if (parseInt(req.app.locals.OTP) === parseInt(code)) {
+        req.app.locals.OTP = null;
+        req.app.locals.resetSession = true;
+        return res.status(201).send({ msg: 'Verify Successfully!' })
+
+    }
+    return res.status(401).send({ error: "Invalid OTP" })
 }
 
 // GET:api/createResetSession
 export async function createResetSession(req, res) {
-    res.json('createResetSession route');
+    if (req.app.locals.resetSession) {
+        req.app.locals.resetSession = false //allow access only once
+        return res.status(201).send({ msg: "Access granted" })
+    }
+    return res.status(440).send({ error: "session expired!" })
 }
 
 // PUT:api/resetPassword
 export async function resetPassword(req, res) {
-    res.json('resetPassword route');
+    try {
+        const { username, password } = req.body
+    } catch (error) {
+        return res.status(401).send({ error })
+    }
+}
+// POST api/admin/login
+
+export async function adminLogin(req, res) {
+    const cred = {
+        username: "admin",
+        password: "12345@"
+    }
+    const { username, password } = req.body
+    try {
+        if (username === cred.username && password === cred.password) {
+            const adminToken = Jwt.sign({
+                username,
+                password,
+            }, ENV.SECRET, { expiresIn: '24h' })
+            res.status(200).send({
+                msg: "admin login successful",
+                adminToken
+            })
+        }
+        else {
+            res.status(404).send({ error: "username and password wont match!" })
+        }
+    } catch (error) {
+        res.status(500).send(error)
+    }
+}
+// get all users from db
+export async function getAllUsers(req, res) {
+    try {
+        const data = await UserModel.find()
+        if (!data) { res.status(404).send({ error: "Cannot get users details" }) }
+        else {res.status(201).send(data) }
+    } catch (error) {
+        res.status(404).send(error)
+    }
 }
 
+// remove user 
+export async function removedUser(req,res){
+    const {_id}= req.body
+    try {
+        const removedUser = await UserModel.remove({_id})
+        console.log(removedUser);
+    } catch (error) {
+        res.status(404).send(error)
+    }
+}

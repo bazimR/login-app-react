@@ -1,38 +1,56 @@
 import React, { useState } from "react";
 import avatar from "./../assets/profile.png";
-import { Toaster } from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { useFormik } from "formik";
 import { profileValidation } from "../helper/validate";
 import convertToBase64 from "../helper/converter";
+import useFetch from "../assets/hooks/fetch.hook";
+import { updateUser } from "../helper/helper";
 
 import styles from "../styles/Username.module.css";
-import extend from "./../styles/Profile.module.css"
-
-
+import extend from "./../styles/Profile.module.css";
+import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
+  const navigate = useNavigate();
   const [file, setFile] = useState();
+  const [{ isLoading, apiData, serverError }] = useFetch();
   const formik = useFormik({
     initialValues: {
-      firstname:'',
-      lastname:'',
-      mobile:'',
-      address:'',
-      email: "",
+      firstname: apiData?.firstname || "",
+      lastname: apiData?.lastname || "",
+      mobile: apiData?.mobile || "",
+      address: apiData?.address || "",
+      email: apiData?.email || "",
     },
+    enableReinitialize: true,
     validate: profileValidation,
     validateOnBlur: false,
     validateOnChange: false,
     onSubmit: async (values) => {
-      values = Object.assign(values, { profile: file || "" });
-      console.log(values);
+      values = Object.assign(values, {
+        profile: file || apiData?.profile || "",
+      });
+      let updatePromise = updateUser(values);
+      toast.promise(updatePromise, {
+        loading: "Updating....",
+        success: "Updated successfully",
+        error: "updating failed!",
+      });
     },
   });
   const onUpload = async (e) => {
     const base64 = await convertToBase64(e.target.files[0]);
     setFile(base64);
   };
+  // logout function
+  const logoutUser = () => {
+    localStorage.removeItem("token");
+    navigate("/");
+  };
 
+  if (isLoading) return <h1>loading</h1>;
+  if (serverError) return <h1>{serverError.message}</h1>;
   return (
     <div className="container mx-auto">
       <Toaster position="top-center" reverseOrder="false"></Toaster>
@@ -49,7 +67,7 @@ const Profile = () => {
             <div className="profile flex justify-center py-4">
               <label htmlFor="profile">
                 <img
-                  src={file || avatar}
+                  src={file || apiData?.profile || avatar}
                   className={`${styles.profile_img} ${extend.profile_img}`}
                   alt="avatar"
                 />
@@ -107,8 +125,9 @@ const Profile = () => {
             </div>
             <div className="text-center py-4">
               <span className="text.gret-500">
-               Come back later?<br />
-                <button className="text-red-500" to={"/"}>
+                Come back later?
+                <br />
+                <button onClick={logoutUser} className="text-red-500" to={"/"}>
                   Logout
                 </button>
               </span>
